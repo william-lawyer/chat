@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 const WebSocket = require('ws');
 const TelegramBot = require('node-telegram-bot-api');
 const multer = require('multer');
@@ -9,7 +10,6 @@ const path = require('path');
 const TELEGRAM_TOKEN = '7812145059:AAH375hTnRtYzrfmpKI9g-YjB90Z8JbAgtI';
 const TELEGRAM_CHAT_ID = '729406890';
 const PORT = process.env.PORT || 3000;
-const WS_PORT = 8081;
 
 // Multer setup for file uploads
 const upload = multer({ dest: 'uploads/' });
@@ -17,7 +17,8 @@ const upload = multer({ dest: 'uploads/' });
 // Initialize
 const app = express();
 app.use(express.json());
-const wss = new WebSocket.Server({ port: WS_PORT });
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
 // WebSocket clients storage
@@ -162,7 +163,6 @@ bot.on('message', (msg) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-console.log(`WebSocket server running on port ${WS_PORT}`);
