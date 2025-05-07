@@ -6,34 +6,30 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 
-// Settings
 const TELEGRAM_TOKEN = '7812145059:AAH375hTnRtYzrfmpKI9g-YjB90Z8JbAgtI';
 const TELEGRAM_CHAT_ID = '729406890';
 const PORT = process.env.PORT || 3000;
 
-// Multer setup for file uploads
 const upload = multer({ dest: 'uploads/' });
 
-// Initialize
 const app = express();
 app.use(express.json());
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
-// WebSocket clients storage
 const clients = new Map();
-// Message to userId mapping
+
 const messageUserMap = new Map();
-// Banned users storage
+
 const bannedUsers = new Set();
 
-// Create uploads directory if it doesn't exist
+
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
 }
 
-// Handle WebSocket connections
+
 wss.on('connection', (ws, req) => {
   const userId = new URLSearchParams(req.url.split('?')[1]).get('userId') || 'default';
   clients.set(userId, ws);
@@ -45,7 +41,6 @@ wss.on('connection', (ws, req) => {
       ws.send(JSON.stringify({ type: 'bot', text: 'Вы заблокированы и не можете отправлять сообщения.' }));
       return;
     }
-    // Send message to Telegram and save message_id
     bot.sendMessage(TELEGRAM_CHAT_ID, `Сообщение от ${userId}: ${text}`).then((sentMessage) => {
       messageUserMap.set(sentMessage.message_id, userId);
       console.log(`Saved: message_id=${sentMessage.message_id}, userId=${userId}`);
@@ -58,7 +53,6 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// API to send text messages
 app.post('/send-message', (req, res) => {
   const { message, userId } = req.body;
   if (!message || !userId) {
@@ -73,43 +67,41 @@ app.post('/send-message', (req, res) => {
   res.json({ success: true });
 });
 
-// API to send images
 app.post('/send-image', upload.single('image'), (req, res) => {
   const { userId } = req.body;
   const file = req.file;
   if (!file || !userId) {
     if (file) {
-      fs.unlinkSync(file.path); // Delete file if userId is missing
+      fs.unlinkSync(file.path);
     }
     return res.status(400).json({ success: false, error: 'Missing image or userId' });
   }
   if (bannedUsers.has(userId)) {
-    fs.unlinkSync(file.path); // Delete file if user is banned
+    fs.unlinkSync(file.path); 
     return res.status(403).json({ success: false, error: 'User is banned' });
   }
   bot.sendPhoto(TELEGRAM_CHAT_ID, file.path, { caption: `Изображение от ${userId}` }).then((sentMessage) => {
     messageUserMap.set(sentMessage.message_id, userId);
-    fs.unlinkSync(file.path); // Delete temporary file
+    fs.unlinkSync(file.path); 
   }).catch((error) => {
     console.error('Error sending photo to Telegram:', error);
-    fs.unlinkSync(file.path); // Delete file on error
+    fs.unlinkSync(file.path); 
     return res.status(500).json({ success: false, error: 'Failed to send image' });
   });
   res.json({ success: true });
 });
 
-// Handle Telegram messages
+
 bot.on('message', (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
 
-  // Ignore messages sent by the bot
+
   if (chatId == TELEGRAM_CHAT_ID && msg.from.is_bot) {
     return;
   }
 
   if (chatId == TELEGRAM_CHAT_ID) {
-    // Handle /ban command
     if (text.startsWith('/ban')) {
       const userId = text.split(' ')[1];
       if (userId) {
@@ -125,7 +117,6 @@ bot.on('message', (msg) => {
       return;
     }
 
-    // Handle /unban command
     if (text.startsWith('/unban')) {
       const userId = text.split(' ')[1];
       if (userId) {
@@ -141,7 +132,6 @@ bot.on('message', (msg) => {
       return;
     }
 
-    // Handle reply messages
     if (msg.reply_to_message) {
       const repliedMessageId = msg.reply_to_message.message_id;
       const userId = messageUserMap.get(repliedMessageId);
@@ -162,7 +152,7 @@ bot.on('message', (msg) => {
   }
 });
 
-// Start server
+
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
